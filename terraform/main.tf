@@ -31,7 +31,7 @@ resource "aws_route_table" "my_route" {
 
 
   tags = {
-    Name = "example"
+    Name = "my_route"
   }
 }
 
@@ -40,19 +40,11 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.my_route.id
 }
 
-resource "aws_security_group" "main_sg" {
-  name        = "main_sg"
+resource "aws_security_group" "jenkins_sg" {
+  name        = "jenkins_sg"
   vpc_id      = aws_vpc.my_vpc.id
 
   ingress {
-    description      = "Allow http"
-    from_port        = 80
-    to_port          = 80
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-
-  }
-
     ingress {
     description      = "Allow SSH"
     from_port        = 22
@@ -80,30 +72,65 @@ resource "aws_security_group" "main_sg" {
   }
 
   tags = {
-    Name = "main_sg"
+    Name = "jenkins_sg"
   }
 }
 
-resource "aws_instance" "ansible" {
+resource "aws_security_group" "nginx_sg" {
+  name        = "nginx_sg"
+  vpc_id      = aws_vpc.my_vpc.id
+
+  ingress {
+    description      = "Allow http"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+
+  }
+
+    ingress {
+    description      = "Allow SSH"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["${aws_vpc.my_vpc.id}"]
+
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "nginx_sg"
+  }
+}
+
+resource "aws_instance" "jenkins" {
     ami = "ami-0e472ba40eb589f49"
     instance_type = "${var.instance_type}"
-    security_groups = [ "${aws_security_group.main_sg.id}" ]
+    security_groups = [ "${aws_security_group.jenkins_sg.id}" ]
     subnet_id = "${aws_subnet.public.id}"
     key_name = "${var.key_name}"
     user_data = "${file("ansible.sh")}"
     tags = {
-      "Name" = "ansible"
+      "Name" = "jenkins"
     }
 }
 
 resource "aws_instance" "nginx" {
     ami = "ami-0e472ba40eb589f49"
     instance_type = "${var.instance_type}"
-    security_groups = [ "${aws_security_group.main_sg.id}" ]
+    security_groups = [ "${aws_security_group.nginx_sg.id}" ]
     subnet_id = "${aws_subnet.public.id}"
     key_name = "${var.key_name}"
     tags = {
-      "Name" = "Nginx"
+      "Name" = "nginx"
     }
 }
 
