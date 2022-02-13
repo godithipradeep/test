@@ -44,13 +44,12 @@ resource "aws_security_group" "jenkins_sg" {
   name        = "jenkins_sg"
   vpc_id      = aws_vpc.my_vpc.id
 
-  ingress {
     ingress {
     description      = "Allow SSH"
     from_port        = 22
     to_port          = 22
     protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
+    cidr_blocks      = ["${var.ssh_cidr}"]
 
   }
 
@@ -79,6 +78,9 @@ resource "aws_security_group" "jenkins_sg" {
 resource "aws_security_group" "nginx_sg" {
   name        = "nginx_sg"
   vpc_id      = aws_vpc.my_vpc.id
+  depends_on = [
+    aws_instance.jenkins
+  ]
 
   ingress {
     description      = "Allow http"
@@ -94,8 +96,7 @@ resource "aws_security_group" "nginx_sg" {
     from_port        = 22
     to_port          = 22
     protocol         = "tcp"
-    cidr_blocks      = ["${aws_vpc.my_vpc.id}"]
-
+    security_groups = [ "${aws_security_group.jenkins_sg.id}" ]
   }
 
   egress {
@@ -114,7 +115,7 @@ resource "aws_security_group" "nginx_sg" {
 resource "aws_instance" "jenkins" {
     ami = "ami-0e472ba40eb589f49"
     instance_type = "${var.instance_type}"
-    security_groups = [ "${aws_security_group.jenkins_sg.id}" ]
+    vpc_security_group_ids = [ "${aws_security_group.jenkins_sg.id}" ]
     subnet_id = "${aws_subnet.public.id}"
     key_name = "${var.key_name}"
     user_data = "${file("ansible.sh")}"
@@ -126,7 +127,7 @@ resource "aws_instance" "jenkins" {
 resource "aws_instance" "nginx" {
     ami = "ami-0e472ba40eb589f49"
     instance_type = "${var.instance_type}"
-    security_groups = [ "${aws_security_group.nginx_sg.id}" ]
+    vpc_security_group_ids = [ "${aws_security_group.nginx_sg.id}" ]
     subnet_id = "${aws_subnet.public.id}"
     key_name = "${var.key_name}"
     tags = {
@@ -135,7 +136,7 @@ resource "aws_instance" "nginx" {
 }
 
 output "Jenkins_Ansible_server_ip" {
-    value = aws_instance.ansible.public_ip
+    value = aws_instance.jenkins.public_ip
   
 }
 
@@ -144,4 +145,8 @@ output "nginx_ip" {
   
 }
 
+output "nginx_private_ip" {
+    value = aws_instance.nginx.private_ip
+  
+}
 
